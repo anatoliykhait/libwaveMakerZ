@@ -132,6 +132,38 @@ Foam::scalar Foam::waveMakerZPointPatchVectorField::V33
 }
 
 
+void Foam::waveMakerZPointPatchVectorField::output()
+{
+    std::ofstream filestream;
+    filestream.open("spectra", std::ios::out);
+    filestream << "% w ; k ; k2w ; free ; bound ;"
+               << " wavemaker(1) ; wavemaker d (2) ; wavemaker b (2) ;"
+               << " wavemaker total (1+2)";
+    for (long unsigned int j = 0; j < w_.size(); ++j)
+    {
+        filestream << "\n" << w_[j] << " " << k_[j] << " " << k2w_[j] << " "
+                           << abs(Aa_[j]) << " " << abs(AbPF_[j]) << " "
+                           << abs(AX1_[j]) << " " << abs(AX2d_[j]) << " "
+                           << abs(AX2b_[j]) << " " << abs(AX12_[j]);
+    }
+    filestream.close();
+
+    filestream.open("time_series", std::ios::out);
+    filestream << "% time ; free ; bound ;"
+               << " wavemaker(1) ; wavemaker d (2) ; wavemaker b (2) ;"
+               << " wavemaker total (1+2)";
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    {
+        filestream << "\n" << inputTime_[j] << " "
+                           << inputElevation_[j] << " "
+                           << elevationBound_[j] << " "
+                           << XX1_[j] << " " << XX2d_[j] << " "
+                           << XX2b_[j] << " " << XX12_[j];
+    }
+    filestream.close();
+}
+
+
 void Foam::waveMakerZPointPatchVectorField::spectrum()
 {
     // Arrays for fft
@@ -153,128 +185,267 @@ void Foam::waveMakerZPointPatchVectorField::spectrum()
     fftw_destroy_plan(plan);
     fftw_cleanup();
 
-    Aa.clear();
-    Aa.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+    Aa_.clear();
+    Aa_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
 
     long unsigned int nBy2 = round(0.5 * n);
-    for (long unsigned int j = 1; j < Aa.size(); ++j)
+    for (long unsigned int j = 1; j < Aa_.size(); ++j)
     {
         if (j < nBy2)
         {
-            Aa[j] = std::complex<double>(fft_outp[j][REAL] / nBy2,
-                                         fft_outp[j][IMAG] / nBy2);
+            Aa_[j] = std::complex<double>(fft_outp[j][REAL] / nBy2,
+                                          fft_outp[j][IMAG] / nBy2);
         }
         else
         {
-            Aa[j] = std::complex<double>(0.0, 0.0);
+            Aa_[j] = std::complex<double>(0.0, 0.0);
         }
     }
 
-    w.clear();
-    w.resize(numHarmonics_+1, 0.0);
+    w_.clear();
+    w_.resize(numHarmonics_+1, 0.0);
 
-    for (long unsigned int j = 1; j < Aa.size(); ++j)
+    for (long unsigned int j = 1; j < Aa_.size(); ++j)
     {
-        Aa[j] = std::conj(Aa[j]);
-        w[j] = 2.0 * M_PI * j / (inputTime_.back() -
-                                 inputTime_.front());
+        Aa_[j] = std::conj(Aa_[j]);
+        w_[j] = 2.0 * M_PI * j / (inputTime_.back() -
+                                  inputTime_.front());
     }
 
     // Calculate wave numbers
-    k.clear();
-    k.resize(numHarmonics_+1, 0.0);
-    for (long unsigned int j = 1; j < w.size(); ++j)
+    k_.clear();
+    k_.resize(numHarmonics_+1, 0.0);
+    k2w_.clear();
+    k2w_.resize(numHarmonics_+1, 0.0);
+    for (long unsigned int j = 1; j < w_.size(); ++j)
     {
         double k1 = 0.0;
-        double k2 = w[j] * w[j] / grav_;
+        double k2 = w_[j] * w_[j] / grav_;
         int iter = 0;
         while ((fabs(k2 - k1) > 1e-5) && (iter < 1000))
         {
             k1 = k2;
-            k2 = w[j] * w[j] / (grav_ * tanh(k1 * depth_));
+            k2 = w_[j] * w_[j] / (grav_ * tanh(k1 * depth_));
             ++iter;
         }
-        k[j] = k2;
+        k_[j] = k2;
+
+        k1 = 0.0;
+        k2 = 4.0 * w_[j] * w_[j] / grav_;
+        iter = 0;
+        while ((fabs(k2 - k1) > 1e-5) && (iter < 1000))
+        {
+            k1 = k2;
+            k2 = 4.0 * w_[j] * w_[j] / (grav_ * tanh(k1 * depth_));
+            ++iter;
+        }
+        k2w_[j] = k2;
     }
 
     // Calculate 2nd-order bound waves
-    Ab.clear();
-    wb.clear();
-    kb.clear();
-    hb.clear();
+    Ab_.clear();
+    wb_.clear();
+    kb_.clear();
+    hb_.clear();
 
-    for (long unsigned int j = 1; j < w.size(); ++j)
-    for (long unsigned int m = 1; m < w.size(); ++m)
+    for (long unsigned int j = 1; j < w_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
     {
-        double ki = k[j] + k[m];
+        double ki = k_[j] + k_[m];
         double wi = sqrt(grav_ * ki * tanh(ki * depth_));
         std::complex<double> bnd =
-                - V11(wi, w[j], w[m], ki, k[j], k[m])
-                / (wi - w[j] - w[m])
-                * (M_PI * sqrt(2.0 * grav_ / w[j]) * Aa[j])
-                * (M_PI * sqrt(2.0 * grav_ / w[m]) * Aa[m]);
+                - V11(wi, w_[j], w_[m], ki, k_[j], k_[m])
+                / (wi - w_[j] - w_[m])
+                * (M_PI * sqrt(2.0 * grav_ / w_[j]) * Aa_[j])
+                * (M_PI * sqrt(2.0 * grav_ / w_[m]) * Aa_[m]);
         std::complex<double> AbZ =
                   (1.0 / M_PI) * sqrt(wi / (2.0 * grav_)) * bnd;
-        hb.push_back(j + m);
-        wb.push_back(w[j] + w[m]);
-        kb.push_back(ki);
-        Ab.push_back(AbZ);
+        hb_.push_back(j + m);
+        wb_.push_back(w_[j] + w_[m]);
+        kb_.push_back(ki);
+        Ab_.push_back(AbZ);
 
         if (j != m)
         {
-            ki = - k[j] + k[m];
+            ki = - k_[j] + k_[m];
             wi = sqrt(grav_ * ki * tanh(ki * depth_));
-            bnd = - V22(wi, w[j], w[m], ki, k[j], k[m])
-                  / (wi + w[j] - w[m])
-                  * std::conj(M_PI * sqrt(2.0 * grav_ / w[j]) * Aa[j])
-                  * (M_PI * sqrt(2.0 * grav_ / w[m]) * Aa[m]);
+            bnd = - V22(wi, w_[j], w_[m], ki, k_[j], k_[m])
+                  / (wi + w_[j] - w_[m])
+                  * std::conj(M_PI * sqrt(2.0 * grav_ / w_[j]) * Aa_[j])
+                  * (M_PI * sqrt(2.0 * grav_ / w_[m]) * Aa_[m]);
             AbZ = (1.0 / M_PI) * sqrt(wi / (2.0 * grav_)) * bnd;
-            hb.push_back(- j + m);
-            wb.push_back(- w[j] + w[m]);
-            kb.push_back(ki);
-            Ab.push_back(AbZ);
+            hb_.push_back(- j + m);
+            wb_.push_back(- w_[j] + w_[m]);
+            kb_.push_back(ki);
+            Ab_.push_back(AbZ);
         }
 
-        ki = - k[j] - k[m];
+        ki = - k_[j] - k_[m];
         wi = sqrt(grav_ * ki * tanh(ki * depth_));
-        bnd = - V33(wi, w[j], w[m], ki, k[j], k[m])
-              / (wi + w[j] + w[m])
-              * std::conj(M_PI * sqrt(2.0 * grav_ / w[j]) * Aa[j])
-              * std::conj(M_PI * sqrt(2.0 * grav_ / w[m]) * Aa[m]);
+        bnd = - V33(wi, w_[j], w_[m], ki, k_[j], k_[m])
+              / (wi + w_[j] + w_[m])
+              * std::conj(M_PI * sqrt(2.0 * grav_ / w_[j]) * Aa_[j])
+              * std::conj(M_PI * sqrt(2.0 * grav_ / w_[m]) * Aa_[m]);
         AbZ = (1.0 / M_PI) * sqrt(wi / (2.0 * grav_)) * bnd;
-        hb.push_back(- j - m);
-        wb.push_back(- w[j] - w[m]);
-        kb.push_back(ki);
-        Ab.push_back(AbZ);
+        hb_.push_back(- j - m);
+        wb_.push_back(- w_[j] - w_[m]);
+        kb_.push_back(ki);
+        Ab_.push_back(AbZ);
     }
 
     // Convert bound wave spectrum to positive-frequecy
-    AbPF.clear();
-    AbPF.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
-    for (long unsigned int j = 0; j < hb.size(); ++j)
+    AbPF_.clear();
+    AbPF_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+    for (long unsigned int j = 0; j < hb_.size(); ++j)
     {
-        if (abs(hb[j]) <= numHarmonics_)
+        if (abs(hb_[j]) <= numHarmonics_)
         {
-            if (hb[j] >= 0)
+            if (hb_[j] >= 0)
             {
-                AbPF[hb[j]] = AbPF[hb[j]] + Ab[j];
+                AbPF_[hb_[j]] = AbPF_[hb_[j]] + Ab_[j];
             }
             else
             {
-                AbPF[abs(hb[j])] = AbPF[abs(hb[j])] + std::conj(Ab[j]);
+                AbPF_[abs(hb_[j])] = AbPF_[abs(hb_[j])] + std::conj(Ab_[j]);
             }
         }
     }
 
-    std::ofstream filestream;
-    filestream.open("elevation_spectrum", std::ios::out);
-    filestream << "% w ; k ; free ; bound";
-    for (long unsigned int j = 0; j < w.size(); ++j)
+    elevationBound_.clear();
+    elevationBound_.resize(inputTime_.size(), 0.0);
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 0; m < hb_.size(); ++m)
     {
-        filestream << "\n" << w[j] << " " << k[j] << " "
-                           << abs(Aa[j]) << " " << abs(AbPF[j]);
+        elevationBound_[j] = elevationBound_[j] +
+      + real(Ab_[m] * exp(- i1 * wb_[m] * inputTime_[j]));
     }
-    filestream.close();
+}
+
+
+void Foam::waveMakerZPointPatchVectorField::wavemakerMotion()
+{
+    // Calculate first-order wavemaker motion
+    AX1_.clear();
+    AX1_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+
+    std::vector<double> Lambda1;
+    Lambda1.resize(numHarmonics_+1, 0.0);
+
+    for (long unsigned int j = 1; j < w_.size(); ++j)
+    {
+        double kappa1 = grav_ * k_[j] / (w_[j] * cosh(k_[j] * depth_));
+        Lambda1[j] = kappa1 * k_[j] * (depth_ + hinge_) 
+                   * (sinh(2.0 * k_[j] * depth_) +2.0 * k_[j] * depth_)
+                   / (4.0 * (1.0 - cosh(k_[j] * depth_)
+                   + k_[j] * (depth_ + hinge_) * sinh(k_[j] * depth_)));
+        std::complex<double> AdX1 = Lambda1[j] * Aa_[j];
+        AX1_[j] = i1 * AdX1 / w_[j];
+    }
+
+    XX1_.clear();
+    XX1_.resize(inputTime_.size(), 0.0);
+
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
+    {
+        XX1_[j] = XX1_[j] + real(AX1_[m] * exp(- i1 * w_[m] * inputTime_[j]));
+    }
+
+    // Second-order correction due to finite displacements of the wavemaker
+    AX2d_.clear();
+    AX2d_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+
+    for (long unsigned int j = 1; j < w_.size(); ++j)
+    {
+        int j2 = j * 2;
+        if (j2 <= numHarmonics_)
+        {
+            double kappa_d = Lambda1[j] * grav_ * k_[j]
+                           / (2.0 * (depth_ + hinge_) * w_[j] * w_[j]
+                           * cosh(k_[j] * depth_));
+            double G = k2w_[j] / sqr(k_[j] - k2w_[j])
+                     - k2w_[j] / sqr(k_[j] + k2w_[j])
+                     + k2w_[j] * cosh((k2w_[j] + k_[j]) * depth_)
+                     / sqr(k_[j] + k2w_[j])
+                     + k_[j] * (depth_ + hinge_)
+                     * sinh((k_[j] + k2w_[j]) * depth_) / (k_[j] + k2w_[j])
+                     + k_[j] * (k_[j] - k2w_[j]) * (depth_ + hinge_)
+                     * sinh((k_[j] - k2w_[j]) * depth_)
+                     / sqr(k_[j] - k2w_[j])
+                     - k2w_[j] * cosh((k_[j] - k2w_[j]) * depth_)
+                     / sqr(k_[j] - k2w_[j]);
+            std::complex<double> AdX2d = - kappa_d * k2w_[j] * k2w_[j]
+                     * (depth_ + hinge_) / (
+                          2.0 * (1.0 - cosh(k2w_[j] * depth_)
+                        + k2w_[j] * (depth_ + hinge_) * sinh(k2w_[j] * depth_))
+                     ) * G * Aa_[j] * Aa_[j];
+            AX2d_[j2] = i1 * AdX2d / w_[j];
+        }
+    }
+
+    XX2d_.clear();
+    XX2d_.resize(inputTime_.size(), 0.0);
+
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
+    {
+        XX2d_[j] = XX2d_[j] + real(AX2d_[m] * exp(- i1 * w_[m] * inputTime_[j]));
+    }
+
+    // Second-order correction due to bound waves
+    AX2b_.clear();
+    AX2b_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+
+    for (long unsigned int j = 0; j < hb_.size(); ++j)
+    {
+        double kappa2 = 3 * wb_[j] / (sinh(kb_[j] * depth_)
+                                   * (2.0 + cosh(kb_[j] * depth_)));
+        double Lambda2 = kappa2 * kb_[j] * (depth_ + hinge_)
+                       * (sinh(2.0 * kb_[j] * depth_) + 2.0 * kb_[j] * depth_)
+                       / (4.0 * (1.0 - cosh(kb_[j] * depth_)
+                       + kb_[j] * (depth_ + hinge_) * sinh(kb_[j] * depth_)));
+        std::complex<double> AdX2bZ = Lambda2 * Ab_[j];
+        std::complex<double> AX2bZ = i1 * AdX2bZ / wb_[j];
+
+        if (abs(hb_[j]) <= numHarmonics_)
+        {
+            if (hb_[j] >= 0)
+            {
+                AX2b_[hb_[j]] = AX2b_[hb_[j]] + AX2bZ;
+            }
+            else
+            {
+                AX2b_[abs(hb_[j])] = AX2b_[abs(hb_[j])] + std::conj(AX2bZ);
+            }
+        }
+    }
+
+    XX2b_.clear();
+    XX2b_.resize(inputTime_.size(), 0.0);
+
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
+    {
+        XX2b_[j] = XX2b_[j] + real(AX2b_[m] * exp(- i1 * w_[m] * inputTime_[j]));
+    }
+
+    // Total wavemaker motion
+    AX12_.clear();
+    AX12_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+
+    for (long unsigned int j = 1; j < w_.size(); ++j)
+    {
+        AX12_[j] = AX1_[j] + AX2d_[j] + AX2b_[j];
+    }
+
+    XX12_.clear();
+    XX12_.resize(inputTime_.size(), 0.0);
+
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
+    {
+        XX12_[j] = XX12_[j] + real(AX12_[m] * exp(- i1 * w_[m] * inputTime_[j]));
+    }
 }
 
 
@@ -310,6 +481,7 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 :
     fixedValuePointPatchField<vector>(p, iF, dict, false),
     motionType_(motionTypeNames.lookup("motionType", dict)),
+    secondOrder_(dict.get<bool>("secondOrder")),
     n_(dict.get<vector>("n")),
     gHat_(Zero),
     depth_(dict.get<scalar>("depth")),
@@ -363,6 +535,10 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 
     spectrum();
 
+    wavemakerMotion();
+
+    output();
+
     if (!dict.found("value"))
     {
         updateCoeffs();
@@ -380,6 +556,7 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 :
     fixedValuePointPatchField<vector>(ptf, p, iF, mapper),
     motionType_(ptf.motionType_),
+    secondOrder_(ptf.secondOrder_),
     n_(ptf.n_),
     gHat_(ptf.gHat_),
     depth_(ptf.depth_),
@@ -400,6 +577,7 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 :
     fixedValuePointPatchField<vector>(ptf, iF),
     motionType_(ptf.motionType_),
+    secondOrder_(ptf.secondOrder_),
     n_(ptf.n_),
     gHat_(ptf.gHat_),
     depth_(ptf.depth_),
@@ -423,20 +601,31 @@ void Foam::waveMakerZPointPatchVectorField::updateCoeffs()
 
     const scalar t = db().time().value();
 
+    scalar motionX = 0.0;
+
+    for (long unsigned int j = 1; j < w_.size(); ++j)
+    {
+        if (secondOrder_)
+        {
+            motionX = motionX + real(AX12_[j] * exp(- i1 * w_[j] * t));
+        }
+        else
+        {
+            motionX = motionX + real(AX1_[j] * exp(- i1 * w_[j] * t));
+        }
+    }
+
     switch (motionType_)
     {
         case motionTypes::hinged:
         {
-            scalar motionX = 0.05*sin(5.0*t);
-
             const pointField& points = patch().localPoints();
-            // const scalarField dz(-(points & gHat_) + hinge_ - initialDepth_);
             const scalarField shapeFunc
                   (1 - (points & gHat_) / (hinge_ + depth_));
 
             Field<vector>::operator=
             (
-                n_*timeCoeff(t)*motionX*shapeFunc
+                n_ * timeCoeff(t) * motionX * shapeFunc
             );
 
             break;
@@ -466,7 +655,6 @@ void Foam::waveMakerZPointPatchVectorField::updateCoeffs()
                 << abort(FatalError);
         }
     }
-        
 
     fixedValuePointPatchField<vector>::updateCoeffs();
 }

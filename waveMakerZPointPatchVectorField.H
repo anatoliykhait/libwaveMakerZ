@@ -117,8 +117,14 @@ class waveMakerZPointPatchVectorField
 
         const std::complex<double> i1 = std::complex<double>(0.0, 1.0);
 
+        //- Absolute value of gravity
+        scalar grav_;
+
         //- Motion type
         motionTypes motionType_;
+
+        //- Type of wave generation
+        bool secondOrder_;
 
         //- Patch normal direction
         //  Note: cannot use patch normal of the initial patch unless it is
@@ -152,33 +158,59 @@ class waveMakerZPointPatchVectorField
     // -------------------------------------------------------------------------
 
         //- Complex spectrum of free waves
-        std::vector<std::complex<double>> Aa;
+        std::vector<std::complex<double>> Aa_;
 
         //- Angular frequency
-        std::vector<double> w;
+        std::vector<double> w_;
 
         //- Wave number
-        std::vector<double> k;
+        std::vector<double> k_;
+
+        //- k2w = k(2*w)
+        std::vector<double> k2w_;
 
         //- Complex spectrum of bound waves
-        std::vector<std::complex<double>> Ab;
+        std::vector<std::complex<double>> Ab_;
 
         //- Angular frequency of bound waves
-        std::vector<double> wb;
+        std::vector<double> wb_;
 
         //- Wave number of bound waves
-        std::vector<double> kb;
+        std::vector<double> kb_;
 
         //- Number of bound wave frequency harmonic
-        std::vector<int> hb;
+        std::vector<int> hb_;
 
         //- Complex spectrum of bound waves
         //  in positive-frequecy representation
-        std::vector<std::complex<double>> AbPF;
+        std::vector<std::complex<double>> AbPF_;
 
+        //- Surface elevation of bound waves
+        std::vector<double> elevationBound_;
 
-        //- Absolute value of gravity
-        scalar grav_;
+        //- Spectrum of first-order wavemaker displacements
+        std::vector<std::complex<double>> AX1_;
+
+        //- Second-order spectrum due to finite displacements
+        std::vector<std::complex<double>> AX2d_;
+
+        //- Second-order spectrum due to bound waves
+        std::vector<std::complex<double>> AX2b_;
+
+        //- Spectrum of total wavemaker motion
+        std::vector<std::complex<double>> AX12_;
+
+        //- First-order wavemaker displacements
+        std::vector<double> XX1_;
+
+        //- Second-order motion due to finite displacements
+        std::vector<double> XX2d_;
+
+        //- Second-order motion due to bound waves
+        std::vector<double> XX2b_;
+
+        //- Total wavemaker motion
+        std::vector<double> XX12_;
 
 
     // Protected Member Functions
@@ -226,9 +258,16 @@ class waveMakerZPointPatchVectorField
             const scalar k2
         );
 
+        //- Output results of calculations into text files
+        void output();
 
         //- Read surface elevation from file
+        //  Construct free wave spectrum
+        //  Calculate second-order bound wave spectrum
         void spectrum();
+
+        //- Calculate first- and second-order wavemaker motion
+        void wavemakerMotion();
 
 
     public:
