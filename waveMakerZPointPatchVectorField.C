@@ -35,7 +35,7 @@ License
 const Foam::Enum<Foam::waveMakerZPointPatchVectorField::motionTypes>
 Foam::waveMakerZPointPatchVectorField::motionTypeNames
 ({
-    // { motionTypes::piston, "piston" },
+    { motionTypes::piston, "piston" },
     { motionTypes::hinged, "hinged" }
 });
 
@@ -569,7 +569,9 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 )
 :
     fixedValuePointPatchField<vector>(p, iF),
-    motionType_(motionTypes::hinged), // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    grav_(0),
+    motionType_(motionTypes::piston),
+    secondOrder_(false),
     n_(Zero),
     gHat_(Zero),
     depth_(0),
@@ -580,6 +582,24 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 {
     inputTime_.clear();
     inputElevation_.clear();
+    Aa_.clear();
+    w_.clear();
+    k_.clear();
+    k2w_.clear();
+    Ab_.clear();
+    wb_.clear();
+    kb_.clear();
+    hb_.clear();
+    AbPF_.clear();
+    elevationBound_.clear();
+    AX1_.clear();
+    AX2d_.clear();
+    AX2b_.clear();
+    AX12_.clear();
+    XX1_.clear();
+    XX2d_.clear();
+    XX2b_.clear();
+    XX12_.clear();
 }
 
 
@@ -591,6 +611,7 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 )
 :
     fixedValuePointPatchField<vector>(p, iF, dict, false),
+    grav_(0),
     motionType_(motionTypeNames.lookup("motionType", dict)),
     secondOrder_(dict.get<bool>("secondOrder")),
     n_(dict.get<vector>("n")),
@@ -601,6 +622,25 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
     numHarmonics_(dict.get<scalar>("numHarmonics")),
     inputFile_(dict.lookup("inputFile"))
 {
+    Aa_.clear();
+    w_.clear();
+    k_.clear();
+    k2w_.clear();
+    Ab_.clear();
+    wb_.clear();
+    kb_.clear();
+    hb_.clear();
+    AbPF_.clear();
+    elevationBound_.clear();
+    AX1_.clear();
+    AX2d_.clear();
+    AX2b_.clear();
+    AX12_.clear();
+    XX1_.clear();
+    XX2d_.clear();
+    XX2b_.clear();
+    XX12_.clear();
+
     // Create the co-ordinate system
     if (mag(n_) < SMALL)
     {
@@ -679,6 +719,7 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 )
 :
     fixedValuePointPatchField<vector>(ptf, p, iF, mapper),
+    grav_(ptf.grav_),
     motionType_(ptf.motionType_),
     secondOrder_(ptf.secondOrder_),
     n_(ptf.n_),
@@ -689,7 +730,25 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
     numHarmonics_(ptf.numHarmonics_),
     inputFile_(ptf.inputFile_),
     inputTime_(ptf.inputTime_),
-    inputElevation_(ptf.inputElevation_)
+    inputElevation_(ptf.inputElevation_),
+    Aa_(ptf.Aa_),
+    w_(ptf.w_),
+    k_(ptf.k_),
+    k2w_(ptf.k2w_),
+    Ab_(ptf.Ab_),
+    wb_(ptf.wb_),
+    kb_(ptf.kb_),
+    hb_(ptf.hb_),
+    AbPF_(ptf.AbPF_),
+    elevationBound_(ptf.elevationBound_),
+    AX1_(ptf.AX1_),
+    AX2d_(ptf.AX2d_),
+    AX2b_(ptf.AX2b_),
+    AX12_(ptf.AX12_),
+    XX1_(ptf.XX1_),
+    XX2d_(ptf.XX2d_),
+    XX2b_(ptf.XX2b_),
+    XX12_(ptf.XX12_)
 {}
 
 
@@ -700,6 +759,7 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 )
 :
     fixedValuePointPatchField<vector>(ptf, iF),
+    grav_(ptf.grav_),
     motionType_(ptf.motionType_),
     secondOrder_(ptf.secondOrder_),
     n_(ptf.n_),
@@ -710,7 +770,25 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
     numHarmonics_(ptf.numHarmonics_),
     inputFile_(ptf.inputFile_),
     inputTime_(ptf.inputTime_),
-    inputElevation_(ptf.inputElevation_)
+    inputElevation_(ptf.inputElevation_),
+    Aa_(ptf.Aa_),
+    w_(ptf.w_),
+    k_(ptf.k_),
+    k2w_(ptf.k2w_),
+    Ab_(ptf.Ab_),
+    wb_(ptf.wb_),
+    kb_(ptf.kb_),
+    hb_(ptf.hb_),
+    AbPF_(ptf.AbPF_),
+    elevationBound_(ptf.elevationBound_),
+    AX1_(ptf.AX1_),
+    AX2d_(ptf.AX2d_),
+    AX2b_(ptf.AX2b_),
+    AX12_(ptf.AX12_),
+    XX1_(ptf.XX1_),
+    XX2d_(ptf.XX2d_),
+    XX2b_(ptf.XX2b_),
+    XX12_(ptf.XX12_)
 {}
 
 

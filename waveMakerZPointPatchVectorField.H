@@ -212,7 +212,6 @@ class waveMakerZPointPatchVectorField
         //- Total wavemaker motion
         std::vector<double> XX12_;
 
-
     // Protected Member Functions
 
         //- Return the gravitational acceleration
