@@ -104,7 +104,7 @@ class waveMakerZPointPatchVectorField
 
         enum motionTypes
         {
-            // piston,
+            piston,
             hinged
         };
 
@@ -267,7 +267,8 @@ class waveMakerZPointPatchVectorField
         void spectrum();
 
         //- Calculate first- and second-order wavemaker motion
-        void wavemakerMotion();
+        void wavemakerHinged();
+        void wavemakerPiston();
 
 
     public:

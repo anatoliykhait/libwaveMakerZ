@@ -322,7 +322,118 @@ void Foam::waveMakerZPointPatchVectorField::spectrum()
 }
 
 
-void Foam::waveMakerZPointPatchVectorField::wavemakerMotion()
+void Foam::waveMakerZPointPatchVectorField::wavemakerPiston()
+{
+    // Calculate first-order wavemaker motion
+    AX1_.clear();
+    AX1_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+
+    std::vector<double> Lambda1;
+    Lambda1.resize(numHarmonics_+1, 0.0);
+
+    for (long unsigned int j = 1; j < w_.size(); ++j)
+    {
+        double kappa1 = grav_ * k_[j] / (w_[j] * cosh(k_[j] * depth_));
+        Lambda1[j] = (kappa1 / 2.0) * (cosh(k_[j] * depth_)
+                   + (k_[j] * depth_) / sinh(k_[j] * depth_));
+        std::complex<double> AdX1 = Lambda1[j] * Aa_[j];
+        AX1_[j] = i1 * AdX1 / w_[j];
+    }
+
+    XX1_.clear();
+    XX1_.resize(inputTime_.size(), 0.0);
+
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
+    {
+        XX1_[j] = XX1_[j] + real(AX1_[m] * exp(- i1 * w_[m] * inputTime_[j]));
+    }
+
+    // Second-order correction due to finite displacements of the wavemaker
+    AX2d_.clear();
+    AX2d_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+
+    for (long unsigned int j = 1; j < w_.size(); ++j)
+    {
+        int j2 = j * 2;
+        if (j2 <= numHarmonics_)
+        {
+            std::complex<double> AdX2d = - Lambda1[j] * (grav_ / 2.0)
+                * k2w_[j] / (k2w_[j] * k2w_[j] - k_[j] * k_[j])
+                * sqr(k_[j] / w_[j])
+                * (k2w_[j] - k_[j] * cosh(k2w_[j] * depth_)
+                                   / sinh(k2w_[j] * depth_)
+                * tanh(k_[j] * depth_)) * Aa_[j] * Aa_[j];
+            AX2d_[j2] = i1 * AdX2d / w_[j];
+        }
+    }
+
+    XX2d_.clear();
+    XX2d_.resize(inputTime_.size(), 0.0);
+
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
+    {
+        XX2d_[j] = XX2d_[j] + real(AX2d_[m] * exp(- i1 * w_[m] * inputTime_[j]));
+    }
+
+    // Second-order correction due to bound waves
+    AX2b_.clear();
+    AX2b_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+
+    for (long unsigned int j = 0; j < hb_.size(); ++j)
+    {
+        double kappa2 = 3 * wb_[j] / (sinh(kb_[j] * depth_)
+                                   * (2.0 + cosh(kb_[j] * depth_)));
+        double Lambda2 = (kappa2 / 2.0) * (cosh(kb_[j] * depth_)
+                       + (kb_[j] * depth_) / sinh(kb_[j] * depth_));
+
+        std::complex<double> AdX2bZ = Lambda2 * Ab_[j];
+        std::complex<double> AX2bZ = i1 * AdX2bZ / wb_[j];
+
+        if (abs(hb_[j]) <= numHarmonics_)
+        {
+            if (hb_[j] >= 0)
+            {
+                AX2b_[hb_[j]] = AX2b_[hb_[j]] + AX2bZ;
+            }
+            else
+            {
+                AX2b_[abs(hb_[j])] = AX2b_[abs(hb_[j])] + std::conj(AX2bZ);
+            }
+        }
+    }
+
+    XX2b_.clear();
+    XX2b_.resize(inputTime_.size(), 0.0);
+
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
+    {
+        XX2b_[j] = XX2b_[j] + real(AX2b_[m] * exp(- i1 * w_[m] * inputTime_[j]));
+    }
+
+    // Total wavemaker motion
+    AX12_.clear();
+    AX12_.resize(numHarmonics_+1, std::complex<double>(0.0, 0.0));
+
+    for (long unsigned int j = 1; j < w_.size(); ++j)
+    {
+        AX12_[j] = AX1_[j] + AX2d_[j] + AX2b_[j];
+    }
+
+    XX12_.clear();
+    XX12_.resize(inputTime_.size(), 0.0);
+
+    for (long unsigned int j = 0; j < inputTime_.size(); ++j)
+    for (long unsigned int m = 1; m < w_.size(); ++m)
+    {
+        XX12_[j] = XX12_[j] + real(AX12_[m] * exp(- i1 * w_[m] * inputTime_[j]));
+    }
+}
+
+
+void Foam::waveMakerZPointPatchVectorField::wavemakerHinged()
 {
     // Calculate first-order wavemaker motion
     AX1_.clear();
@@ -513,7 +624,7 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
         inputElevation_.clear();
         char filename[inputFile_.length()];
         sprintf(filename, "%s", inputFile_.c_str());
-        Info << "\nReading file : " << filename << endl << endl;
+        // Info << "\nReading file : " << filename << endl << endl;
         std::ifstream filestream(filename);
         filestream.seekg(0, std::ios::beg);
         string fileline;
@@ -535,7 +646,20 @@ Foam::waveMakerZPointPatchVectorField::waveMakerZPointPatchVectorField
 
     spectrum();
 
-    wavemakerMotion();
+    if (motionType_ == motionTypes::hinged)
+    {
+        wavemakerHinged();
+    }
+    else if (motionType_ == motionTypes::piston)
+    {
+        wavemakerPiston();
+    }
+    else
+    {
+        FatalErrorInFunction
+                << "Unhandled enumeration " << motionTypeNames[motionType_]
+                << abort(FatalError);
+    }
 
     output();
 
@@ -630,24 +754,15 @@ void Foam::waveMakerZPointPatchVectorField::updateCoeffs()
 
             break;
         }
-        // case motionTypes::piston:
-        // {
-        //     const scalar m1 = 2*(cosh(2*kh) - 1)/(sinh(2*kh) + 2*kh);
+        case motionTypes::piston:
+        {
+            Field<vector>::operator=
+            (
+                n_ * timeCoeff(t) * motionX
+            );
 
-        //     scalar motionX = 0.5*waveHeight_/m1*sin(sigma*t);
-
-        //     if (secondOrder_)
-        //     {
-        //         motionX += 
-        //             sqr(waveHeight_)
-        //            /(32*initialDepth_)*(3*cosh(kh)
-        //            /pow3(sinh(kh)) - 2/m1);
-        //     }
-
-        //     Field<vector>::operator=(n_*timeCoeff(t)*motionX);
-
-        //     break;
-        // }
+            break;
+        }
         default:
         {
             FatalErrorInFunction
@@ -664,10 +779,12 @@ void Foam::waveMakerZPointPatchVectorField::write(Ostream& os) const
 {
     pointPatchField<vector>::write(os);
     os.writeEntry("motionType", motionTypeNames[motionType_]);
+    os.writeEntry("secondOrder", secondOrder_);
     os.writeEntry("n", n_);
     os.writeEntry("depth", depth_);
     os.writeEntry("rampTime", rampTime_);
     os.writeEntry("hingeLocation", hinge_);
+    os.writeEntry("numHarmonics", numHarmonics_);
     os.writeEntry("inputFile", inputFile_);
     writeEntry("value", os);
 }
