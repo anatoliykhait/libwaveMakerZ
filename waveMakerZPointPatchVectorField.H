@@ -26,48 +26,57 @@ Class
 
 Description
     Point motion boundary condition to generate waves based on either piston
-    or flap motions.
+    or hinged motions.
 
-    Based on the reference
-    \verbatim
-        Hughes, S.A. (1993).
-        Physical Models And Laboratory Techniques In Coastal Engineering.
-        Advanced Series On Ocean Engineering, volume 7
-    \endverbatim
+    Second-order correction to the wavemaker motion is based on
+    Zakharov theory and is introduced according to the following references:
+    [1] A. Khait, L. Shemer.
+        Nonlinear wave generation by a wavemaker in deep to intermediate
+        water depth. Ocean Engineering 182 (2019) 222–234
+    [2] Anatoliy Khait, Lev Shemer.
+        Nonlinear generation of narrow-banded wave trains.
+        OMAE2019-95364
+
+    Anatoliy Khait (haitanatoliy@gmail.com)
+    Lev Shemer (shemerl@tauex.tau.ac.il ; shemer@eng.tau.ac.il)
+
+    If you use this library please cite our papers.
 
 Usage
     Example patch specification
-    \verbatim
     leftwall
     {
-        type            waveMaker; 
-        motionType      flap;
+        type            waveMakerZ;
+        value           uniform (0 0 0);
+
+        motionType      hinged;
+        secondOrder     true;
         n               (1 0 0);
-        initialDepth    0.25;
-        wavePeriod      2.0;
-        waveHeight      0.06;
-        wavePhase       0;
-        rampTime        2.0;
+        depth           0.7;
+        rampTime        3.0;
+        hingeLocation   0.7;
+        numHarmonics    32;
+        inputFile       "signal";
     }
-    \endverbatim
 
     where
     \table
-        Property     | Description                  | Required | Default value
-        motionType   | See motion types below       | yes      |
-        x0           | Reference point on patch     | yes      |
-        n            | Direction of motion          | yes      |
-        initialDepth | Initial depth                | yes      |
-        wavePeriod   | wave period                  | yes      |
-        waveHeight   | Wave height                  | yes      |
-        wavePhase    | wave phase                   | yes      |
-        rampTime     | Time to reach maximum motion | yes      |
-        secondOrder  | Second order calculation     | no       | no
+        Property      | Description                   | Required | Default
+        --------------|-------------------------------|----------|---------
+        motionType    | See motion types below        | yes      |
+        secondOrder   | Second-order correction       | yes      |
+        n             | Direction of motion           | yes      |
+        depth         | Wave tank depth               | yes      |
+        rampTime      | Time to reach maximum motion  | yes      |
+        hingeLocation | Location of the hinge         | yes      |
+        numHarmonics  | Number of frequency harmonics | yes      |
+                      |               to be considere |          |
+        inputFile     | File with driving signal      | yes      |
     \endtable
 
     Available motion types include:
     - piston
-    - flap
+    - hinged
 
 SourceFiles
     waveMakerZPointPatchVectorField.C
