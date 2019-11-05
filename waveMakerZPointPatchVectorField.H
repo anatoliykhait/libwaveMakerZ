@@ -28,8 +28,10 @@ Description
     Point motion boundary condition to generate waves based on either piston
     or hinged motions.
 
-    Second-order correction to the wavemaker motion is based on
-    Zakharov theory and is introduced according to the following references:
+    The second-order correction to the wavemaker motion is based on
+    the Zakharov theory.
+
+    If you use this library please cite our papers:
     [1] A. Khait, L. Shemer.
         Nonlinear wave generation by a wavemaker in deep to intermediate
         water depth. Ocean Engineering 182 (2019) 222–234
@@ -37,10 +39,9 @@ Description
         Nonlinear generation of narrow-banded wave trains.
         OMAE2019-95364
 
-    Anatoliy Khait (haitanatoliy@gmail.com)
-    Lev Shemer (shemerl@tauex.tau.ac.il ; shemer@eng.tau.ac.il)
-
-    If you use this library please cite our papers.
+    Dr. Anatoliy Khait (haitanatoliy@gmail.com)
+    Prof. Lev Shemer (shemerl@tauex.tau.ac.il ; shemer@eng.tau.ac.il)
+    Dr. Zhihua Ma (z.ma@mmu.ac.uk)
 
 Usage
     Example patch specification
@@ -52,9 +53,9 @@ Usage
         motionType      hinged;
         secondOrder     true;
         n               (1 0 0);
-        depth           0.7;
+        depth           0.75;
         rampTime        3.0;
-        hingeLocation   0.7;
+        hingeLocation   0.75;
         numHarmonics    32;
         inputFile       "signal";
     }
