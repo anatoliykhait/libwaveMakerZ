@@ -71,8 +71,9 @@ Usage
         rampTime      | Time to reach maximum motion  | yes      |
         hingeLocation | Location of the hinge         | yes      |
         numHarmonics  | Number of frequency harmonics | yes      |
-                      |               to be considere |          |
-        inputFile     | File with driving signal      | yes      |
+                      |              to be considered |          |
+        inputFile     | File with the 1st-order       | yes      |
+                      |             surface elevation |          |
     \endtable
 
     Available motion types include:
